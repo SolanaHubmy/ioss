@@ -1,0 +1,47 @@
+workflows:
+  pixpay-ios:
+    name: PIXPAY iOS (IPA)
+    environment:
+      xcode: latest
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.pixpay.app
+    integrations:
+      app_store_connect: NAMA_INTEGRASI_APP_STORE_CONNECT
+    scripts:
+      - name: Pasang XcodeGen
+        script: |
+          brew install xcodegen
+
+      - name: Generate proyek Xcode
+        script: |
+          set -e
+          PROJECT_YML="$(find "$CM_BUILD_DIR" -name project.yml -not -path '*/.git/*' | head -n 1)"
+          if [ -z "$PROJECT_YML" ]; then
+            echo "project.yml tidak ditemukan. Pastikan folder proyek ada di repository."
+            exit 1
+          fi
+          cd "$(dirname "$PROJECT_YML")"
+          sed -i '' "s/CURRENT_PROJECT_VERSION: .*/CURRENT_PROJECT_VERSION: \"${BUILD_NUMBER:-1}\"/" project.yml
+          xcodegen generate
+          ls -d *.xcodeproj
+
+      - name: Pasang signing
+        script: |
+          set -e
+          cd "$(dirname "$(find "$CM_BUILD_DIR" -name project.yml -not -path '*/.git/*' | head -n 1)")"
+          xcode-project use-profiles
+
+      - name: Build IPA
+        script: |
+          set -e
+          cd "$(dirname "$(find "$CM_BUILD_DIR" -name project.yml -not -path '*/.git/*' | head -n 1)")"
+          xcode-project build-ipa --project "PIXPAY.xcodeproj" --scheme "PIXPAY"
+
+    artifacts:
+      - "**/build/ios/ipa/*.ipa"
+
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
